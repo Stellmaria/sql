@@ -141,4 +141,15 @@ ORDER BY company.name;
 -- FROM employee_view
 -- WHERE name = 'Facebook';
 
+ALTER TABLE IF EXISTS employee -- IF EXISTS - проверяет таблицу на ее существование
+    ADD COLUMN gender INT; -- Обновление таблицы
 
+UPDATE employee -- Обновление данных
+SET gender = 1
+WHERE id <= 2;
+
+ALTER TABLE employee -- Устанавливаем ограничение
+    ALTER COLUMN gender SET NOT NULL;
+
+ALTER TABLE employee -- Удаление колонки
+    DROP COLUMN gender;
