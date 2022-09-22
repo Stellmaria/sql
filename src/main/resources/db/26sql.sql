@@ -40,7 +40,24 @@ CREATE TABLE ticket
     flight_id      BIGINT REFERENCES flight (id) NOT NULL,
     seat_no        VARCHAR(4)                    NOT NULL,
     cost           NUMERIC(8, 2)                 NOT NULL
+--     UNIQUE (flight_id, seat_no)
 );
+
+CREATE UNIQUE INDEX unique_flight_id_seat_no_idx
+    ON ticket (flight_id, seat_no);
+
+SELECT *
+FROM ticket -- Использует индекс
+WHERE seat_no = 'B1'
+  AND flight_id = 5;
+
+SELECT count(DISTINCT flight_id)
+FROM ticket; -- Селективность
+
+SELECT count(*)
+FROM ticket;
+-- 9 /55
+-- 55 / 55 = 1 Лучше поиск
 
 INSERT INTO airport (code, country, city)
 VALUES ('MNK', 'Беларусь', 'Минск'),
@@ -63,7 +80,7 @@ INSERT INTO flight(flight_no, departure_date, departure_airport_code, arrival_da
                    status)
 VALUES ('MN3002', '2020-06-14T14:30', 'MNK', '2020-06-14T18:07', 'LDN', 1, 'ARRIVED'),
        ('MN3002', '2020-06-16T09:15', 'LDN', '2020-06-16T13:00', 'MNK', 1, 'ARRIVED'),
-       ('BC2001', '2020-07-20T23:25', 'MNK', '2020-07-29T02:43', 'LDN', 2, 'ARRIVED'),
+       ('BC2001', '2020-07-20T23:25', 'MNK', '2020-07-20T02:43', 'LDN', 2, 'ARRIVED'),
        ('BC2001', '2020-08-01T11:00', 'LDN', '2020-08-01T14:15', 'MNK', 2, 'DEPARTED'),
        ('TR3103', '2020-05-03T13:10', 'MSK', '2020-05-03T18:38', 'BSL', 3, 'ARRIVED'),
        ('TR3103', '2020-05-10T07:15', 'BSL', '2020-05-10T12:44', 'MSK', 3, 'CANCELLED'),
@@ -183,6 +200,19 @@ SELECT EXISTS(SELECT 1 FROM ticket WHERE id = 2);
 -- В PostgresSQL можно не указывать 1
 -- Запрос для поиска определенного места
 -- EXISTS возвращает результат логического сравнения
+
+SELECT aircraft_id,
+       s.seat_no
+FROM seat s
+WHERE aircraft_id = 1
+EXCEPT
+SELECT f.aircraft_id,
+       t.seat_no
+FROM ticket t
+         JOIN flight f
+              ON f.id = t.flight_id
+WHERE f.flight_no = 'MN3002'
+  AND f.departure_date::DATE = '2020-06-14';
 
 ------------------------------------------------------------------------------------------------------------------------
 
