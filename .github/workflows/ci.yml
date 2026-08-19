@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - 'agent/**'
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  verify-sql:
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/sql_course
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PGPASSWORD: postgres
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: sql_course
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sql_course"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply Flyway migrations
+        run: mvn -B flyway:migrate
+
+      - name: Run assignment solutions
+        run: |
+          psql -h localhost -U postgres -d sql_course -v ON_ERROR_STOP=1 -f src/main/resources/db/16sql.sql
+          psql -h localhost -U postgres -d sql_course -v ON_ERROR_STOP=1 -f src/main/resources/db/26sql.sql
+
+      - name: Verify SQL results
+        run: psql -h localhost -U postgres -d sql_course -v ON_ERROR_STOP=1 -f src/test/sql/verify.sql
