@@ -1,84 +1,72 @@
-CREATE DATABASE book_repository;
+-- Library assignment solution.
+-- Tasks 1-3 (schema and seed data) are implemented by:
+-- src/main/resources/db/migration/V1__library_schema_and_data.sql
 
-CREATE TABLE author
-(
-    id         SERIAL PRIMARY KEY,
-    first_name VARCHAR(128) NOT NULL,
-    last_name  VARCHAR(128) NOT NULL
-);
-
-CREATE TABLE book
-(
-    id        BIGSERIAL PRIMARY KEY,
-    name      VARCHAR(128) NOT NULL,
-    year      SMALLINT     NOT NULL,
-    pages     SMALLINT     NOT NULL,
-    author_id INT REFERENCES author (id)
-);
-
-INSERT INTO author(first_name, last_name)
-VALUES ('Кей', 'Хорстманн'),
-       ('Стивен', 'Кови'),
-       ('Тони', 'Роббинс'),
-       ('Стивен', 'Кинг'),
-       ('Дейл', 'Карнеги');
-
-SELECT *
-FROM author;
-
-INSERT INTO book(name, year, pages, author_id)
-VALUES ('Java. Библиотека профессионала. Том 1', 2010, 1102, (SELECT id FROM author WHERE last_name = 'Хорстманн')),
-       ('Java. Библиотека профессионала. Том 2', 2012, 954, (SELECT id FROM author WHERE last_name = 'Хорстманн')),
-       ('Java SE 8. Вводный курс', 2015, 203, (SELECT id FROM author WHERE last_name = 'Кови')),
-       ('7 навыков высокоэффективных людей', 1989, 396, (SELECT id FROM author WHERE last_name = 'Кови')),
-       ('Разбуди в себя исполина', 1991, 576, (SELECT id FROM author WHERE last_name = 'Роббинс')),
-       ('Думай и богатей', 1937, 336, (SELECT id FROM author WHERE last_name = 'Роббинс')),
-       ('Богатый папа, бедный папа', 1997, 352, (SELECT id FROM author WHERE last_name = 'Кинг')),
-       ('Квадрант денежного потока', 1998, 368, (SELECT id FROM author WHERE last_name = 'Кинг')),
-       ('Как перестать беспокоится и начать жить', 1948, 368, (SELECT id FROM author WHERE last_name = 'Карнеги')),
-       ('Как завоевывать друзей и оказывать влияние на людей', 1936, 352,
-        (SELECT id FROM author WHERE last_name = 'Карнеги'));
-
+-- Task 4. Books with publication year and author, ascending by year.
 SELECT b.name,
        b.year,
-       (SELECT concat(a.first_name, ' ', a.last_name) FROM author a WHERE a.id = b.author_id)
+       concat(a.first_name, ' ', a.last_name) AS author
 FROM book b
-ORDER BY b.year;
+         JOIN author a ON a.id = b.author_id
+ORDER BY b.year ASC;
 
+-- Task 4. The same result in descending order.
 SELECT b.name,
        b.year,
-       (SELECT concat(a.first_name, ' ', a.last_name) FROM author a WHERE a.id = b.author_id)
+       concat(a.first_name, ' ', a.last_name) AS author
 FROM book b
+         JOIN author a ON a.id = b.author_id
 ORDER BY b.year DESC;
 
-SELECT count(*)
-FROM book
-WHERE author_id IN (SELECT id FROM author WHERE last_name = 'Роббинс');
+-- Task 5. Number of books written by the requested author.
+SELECT count(*) AS book_count
+FROM book b
+         JOIN author a ON a.id = b.author_id
+WHERE a.last_name = 'Роббинс';
 
-SELECT *
-FROM book
-WHERE pages > (SELECT avg(pages)
-               FROM book);
+-- Task 6. Books whose page count is above the average page count.
+SELECT b.*
+FROM book b
+WHERE b.pages > (SELECT avg(pages) FROM book)
+ORDER BY b.pages DESC;
 
-SELECT sum(t.pages)
-FROM (SELECT pages
-      FROM book
-      ORDER BY year
-      LIMIT 5) t;
+-- Task 7. Five oldest books.
+SELECT b.*
+FROM book b
+ORDER BY b.year ASC, b.id ASC
+LIMIT 5;
 
+-- Task 7. Total page count of the same five oldest books.
+WITH oldest_books AS (
+    SELECT pages
+    FROM book
+    ORDER BY year ASC, id ASC
+    LIMIT 5
+)
+SELECT sum(pages) AS total_pages
+FROM oldest_books;
+
+-- Task 8. Change the page count for one book.
 UPDATE book
 SET pages = pages + 5
 WHERE id = 2
-RETURNING name,year,pages;
+RETURNING id, name, year, pages;
 
-DELETE
-FROM book
-WHERE author_id = (SELECT author_id
-                   FROM book
-                   WHERE pages = (SELECT max(pages) FROM book))
-RETURNING *;
-
-DELETE
-FROM author
-WHERE id = 1
-RETURNING *;
+-- Task 9. Delete the author who wrote the largest book.
+-- The target author is derived from the data instead of being hard-coded.
+WITH target_author AS (
+    SELECT author_id
+    FROM book
+    ORDER BY pages DESC, id ASC
+    LIMIT 1
+),
+deleted_books AS (
+    DELETE FROM book b
+        USING target_author ta
+        WHERE b.author_id = ta.author_id
+        RETURNING b.author_id
+)
+DELETE FROM author a
+    USING (SELECT DISTINCT author_id FROM deleted_books) d
+WHERE a.id = d.author_id
+RETURNING a.*;
